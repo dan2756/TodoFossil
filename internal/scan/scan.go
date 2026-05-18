@@ -1,0 +1,56 @@
+package scan
+
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+// DefaultMaxSize is the size in bytes above which files are not scanned.
+const DefaultMaxSize = 1 << 20
+
+// binarySniffLen is how much of a file is checked for NUL bytes, the same
+// heuristic git uses to decide whether a file is binary.
+const binarySniffLen = 8000
+
+// Hit is a marker found in a file.
+type Hit struct {
+	File string // path as given to File
+	Line int    // 1-based line number
+	Match
+}
+
+// File scans the file name, relative to root, for markers. Binary files and
+// files larger than maxSize bytes yield no hits.
+func File(m *Matcher, root, name string, maxSize int64) ([]Hit, error) {
+	p := filepath.Join(root, filepath.FromSlash(name))
+	fi, err := os.Stat(p)
+	if err != nil {
+		return nil, err
+	}
+	if fi.Size() > maxSize {
+		return nil, nil
+	}
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return nil, err
+	}
+	if isBinary(data) || !m.mayContain(data) {
+		return nil, nil
+	}
+	var hits []Hit
+	n := 0
+	for line := range bytes.Lines(data) {
+		n++
+		match, ok := m.Find(strings.TrimRight(string(line), "\r\n"))
+		if ok {
+			hits = append(hits, Hit{File: name, Line: n, Match: match})
+		}
+	}
+	return hits, nil
+}
+
+func isBinary(data []byte) bool {
+	return bytes.IndexByte(data[:min(len(data), binarySniffLen)], 0) >= 0
+}
