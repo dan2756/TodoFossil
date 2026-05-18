@@ -1,0 +1,43 @@
+152579c5f0bdca2ad727172d6838b27f35134cab 3 3 2
+author Maria Lopez
+author-mail <maria@example.com>
+author-time 1735689600
+author-tz -0700
+committer Maria Lopez
+committer-mail <maria@example.com>
+committer-time 1735689600
+committer-tz -0700
+summary add request handler
+boundary
+filename server/handler.go
+	// TODO: validate the redirect target
+152579c5f0bdca2ad727172d6838b27f35134cab 4 4
+		// FIXME(sam): leaks the body on error
+9e4f0c3b7a1d2e5f60718293a4b5c6d7e8f90a1b 2 5 1
+author Sam Okafor
+author-mail <sam@example.com>
+author-time 1767225600
+author-tz +0100
+committer Sam Okafor
+committer-mail <sam@example.com>
+committer-time 1767225600
+committer-tz +0100
+summary cache: honour max-age
+previous 152579c5f0bdca2ad727172d6838b27f35134cab server/handler.go
+filename server/handler.go
+	// HACK until v2 config ships
+152579c5f0bdca2ad727172d6838b27f35134cab 7 9 1
+	/* XXX: tidy up */
+0000000000000000000000000000000000000000 12 12 1
+author Not Committed Yet
+author-mail <not.committed.yet>
+author-time 1779131052
+author-tz +0000
+committer Not Committed Yet
+committer-mail <not.committed.yet>
+committer-time 1779131052
+committer-tz +0000
+summary Version of server/handler.go from server/handler.go
+previous 9e4f0c3b7a1d2e5f60718293a4b5c6d7e8f90a1b server/handler.go
+filename server/handler.go
+	// TODO new

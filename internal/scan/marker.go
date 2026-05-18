@@ -20,10 +20,16 @@ type Match struct {
 
 // Matcher finds markers in lines of text.
 type Matcher struct {
-	re *regexp.Regexp
+	re *regexp.Regexp // any tag as a whole word
 }
 
-var validTag = regexp.MustCompile(`^\w+$`)
+var (
+	validTag = regexp.MustCompile(`^\w+$`)
+	ownerRE  = regexp.MustCompile(`^\(([^()]*)\)`)
+)
+
+// commentClosers are stripped from the end of a marker's text.
+var commentClosers = []string{"*/", "-->", "#}", "%>"}
 
 // NewMatcher returns a Matcher for tags. Tags are case-sensitive and may
 // contain only letters, digits and underscores.
@@ -38,33 +44,60 @@ func NewMatcher(tags []string) (*Matcher, error) {
 		}
 		alts[i] = regexp.QuoteMeta(t)
 	}
-	// A tag as a whole word, an optional (owner), then the rest of the line.
-	re := regexp.MustCompile(`\b(` + strings.Join(alts, "|") + `)\b(?:\(([^()]*)\))?(.*)`)
-	return &Matcher{re: re}, nil
+	return &Matcher{re: regexp.MustCompile(`\b(?:` + strings.Join(alts, "|") + `)\b`)}, nil
 }
 
-// Find returns the first marker on line, if any.
+// Find returns the first marker on line, if any. A marker is a tag as a
+// whole word, optionally followed by "(owner)" and a colon; its text is the
+// rest of the line. A tag that is itself a quoted string, as in
+// []string{"TODO"}, is not a marker.
 func (m *Matcher) Find(line string) (Match, bool) {
-	sm := m.re.FindStringSubmatch(line)
-	if sm == nil {
-		return Match{}, false
+	for _, loc := range m.re.FindAllStringIndex(line, -1) {
+		start, end := loc[0], loc[1]
+		if quoted(line, start, end) {
+			continue
+		}
+		match := Match{Tag: line[start:end]}
+		rest := line[end:]
+		if sm := ownerRE.FindStringSubmatch(rest); sm != nil {
+			match.Owner = strings.TrimSpace(sm[1])
+			rest = rest[len(sm[0]):]
+		}
+		match.Text = cleanText(rest)
+		return match, true
 	}
-	return Match{
-		Tag:   sm[1],
-		Owner: strings.TrimSpace(sm[2]),
-		Text:  cleanText(sm[3]),
-	}, true
+	return Match{}, false
 }
 
-// mayContain reports whether data contains any marker at all, so that most
+// mayContain reports whether data contains any tag at all, so that most
 // files can be skipped without splitting them into lines.
 func (m *Matcher) mayContain(data []byte) bool {
 	return m.re.Match(data)
 }
 
-// cleanText strips the separator between a marker and its text.
+// quoted reports whether line[start:end] is wrapped in matching quotes.
+func quoted(line string, start, end int) bool {
+	if start == 0 || end >= len(line) {
+		return false
+	}
+	q := line[start-1]
+	return (q == '"' || q == '\'' || q == '`') && line[end] == q
+}
+
+// cleanText strips the separator between a marker and its text, and any
+// comment terminator at the end of the line.
 func cleanText(s string) string {
 	s = strings.TrimSpace(s)
-	s = strings.TrimPrefix(s, ":")
+	for _, c := range commentClosers {
+		if t, ok := strings.CutSuffix(s, c); ok {
+			s = strings.TrimSpace(t)
+			break
+		}
+	}
+	if t, ok := strings.CutPrefix(s, ":"); ok {
+		s = t
+	} else if t, ok := strings.CutPrefix(s, "- "); ok {
+		s = t
+	}
 	return strings.TrimSpace(s)
 }
