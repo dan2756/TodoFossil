@@ -6,30 +6,13 @@ import (
 	"time"
 
 	"github.com/dan2756/todo-age/internal/git"
+	"github.com/dan2756/todo-age/internal/report"
 	"github.com/dan2756/todo-age/internal/scan"
 )
 
-// row is one marker together with the blame of its line.
-type row struct {
-	File        string
-	Line        int
-	Tag         string
-	Text        string
-	Owner       string
-	Author      string
-	Email       string
-	Commit      string
-	Date        string
-	AgeDays     int
-	Uncommitted bool
-
-	time time.Time
-	age  time.Duration
-}
-
 // collect scans the tracked files in dir and blames every line that holds
 // a marker. Problems with single files are reported to warn and skipped.
-func collect(dir string, m *scan.Matcher, now time.Time, warn io.Writer) ([]row, error) {
+func collect(dir string, m *scan.Matcher, now time.Time, warn io.Writer) ([]report.Row, error) {
 	if err := git.CheckRepo(dir); err != nil {
 		return nil, err
 	}
@@ -37,7 +20,7 @@ func collect(dir string, m *scan.Matcher, now time.Time, warn io.Writer) ([]row,
 	if err != nil {
 		return nil, err
 	}
-	var rows []row
+	var rows []report.Row
 	for _, f := range files {
 		hits, err := scan.File(m, dir, f, scan.DefaultMaxSize)
 		if err != nil {
@@ -67,8 +50,8 @@ func collect(dir string, m *scan.Matcher, now time.Time, warn io.Writer) ([]row,
 	return rows, nil
 }
 
-func newRow(h scan.Hit, b git.Line, now time.Time) row {
-	r := row{
+func newRow(h scan.Hit, b git.Line, now time.Time) report.Row {
+	r := report.Row{
 		File:   h.File,
 		Line:   h.Line,
 		Tag:    h.Tag,
@@ -76,18 +59,18 @@ func newRow(h scan.Hit, b git.Line, now time.Time) row {
 		Owner:  h.Owner,
 		Author: b.Author,
 		Email:  b.AuthorMail,
-		time:   b.AuthorTime,
+		Time:   b.AuthorTime,
 	}
 	if b.Uncommitted() {
 		// git reports the current time and a placeholder address.
 		r.Uncommitted = true
 		r.Email = ""
-		r.time = now
+		r.Time = now
 	} else {
 		r.Commit = b.Commit[:min(len(b.Commit), 7)]
 	}
-	r.Date = r.time.Format(time.DateOnly)
-	r.age = max(now.Sub(r.time), 0)
-	r.AgeDays = int(r.age / (24 * time.Hour))
+	r.Date = r.Time.Format(time.DateOnly)
+	r.Age = max(now.Sub(r.Time), 0)
+	r.AgeDays = int(r.Age / (24 * time.Hour))
 	return r
 }

@@ -11,9 +11,9 @@ import (
 	"runtime/debug"
 	"slices"
 	"strings"
-	"text/tabwriter"
 	"time"
 
+	"github.com/dan2756/todo-age/internal/report"
 	"github.com/dan2756/todo-age/internal/scan"
 )
 
@@ -28,9 +28,10 @@ Usage:
   todo-age [flags]
 
 Flags:
-  -C dir       run as if todo-age was started in dir
-  --version    print the version and exit
-  -h, --help   show this help
+  -C dir         run as if todo-age was started in dir
+  --format fmt   output format: table (default), json, csv or ndjson
+  --version      print the version and exit
+  -h, --help     show this help
 `
 
 func main() {
@@ -43,6 +44,7 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 	fs.SetOutput(io.Discard)
 	fs.Usage = func() {}
 	dir := fs.String("C", ".", "")
+	format := fs.String("format", "table", "")
 	showVersion := fs.Bool("version", false, "")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -58,6 +60,9 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 	if fs.NArg() > 0 {
 		return usageError(stderr, fmt.Errorf("unexpected argument %q", fs.Arg(0)))
 	}
+	if !report.ValidFormat(*format) {
+		return usageError(stderr, fmt.Errorf("unknown format %q (want %s)", *format, strings.Join(report.Formats, ", ")))
+	}
 
 	m, err := scan.NewMatcher(scan.DefaultTags)
 	if err != nil {
@@ -68,8 +73,8 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 		fmt.Fprintf(stderr, "todo-age: %v\n", err)
 		return 2
 	}
-	slices.SortStableFunc(rows, func(a, b row) int {
-		if c := a.time.Compare(b.time); c != 0 {
+	slices.SortStableFunc(rows, func(a, b report.Row) int {
+		if c := a.Time.Compare(b.Time); c != 0 {
 			return c
 		}
 		if c := strings.Compare(a.File, b.File); c != 0 {
@@ -77,7 +82,7 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 		}
 		return a.Line - b.Line
 	})
-	if err := writeTable(stdout, rows); err != nil {
+	if err := report.Write(stdout, *format, rows); err != nil {
 		fmt.Fprintf(stderr, "todo-age: %v\n", err)
 		return 2
 	}
@@ -87,20 +92,6 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 func usageError(stderr io.Writer, err error) int {
 	fmt.Fprintf(stderr, "todo-age: %v\nRun 'todo-age --help' for usage.\n", err)
 	return 2
-}
-
-func writeTable(w io.Writer, rows []row) error {
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "AGE\tDATE\tAUTHOR\tTAG\tLOCATION\tTEXT")
-	for _, r := range rows {
-		tag := r.Tag
-		if r.Owner != "" {
-			tag += "(" + r.Owner + ")"
-		}
-		fmt.Fprintf(tw, "%dd\t%s\t%s\t%s\t%s:%d\t%s\n",
-			r.AgeDays, r.Date, r.Author, tag, r.File, r.Line, strings.ReplaceAll(r.Text, "\t", " "))
-	}
-	return tw.Flush()
 }
 
 // buildVersion prefers the version stamped by the linker, then the module
