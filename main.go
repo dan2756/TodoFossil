@@ -25,13 +25,19 @@ a git repository, oldest first, with the author and age of each line
 according to git blame.
 
 Usage:
-  todo-age [flags]
+  todo-age [flags] [path ...]
+
+Paths limit the scan to tracked files under them.
 
 Flags:
   -C dir         run as if todo-age was started in dir
   --format fmt   output format: table (default), json, csv or ndjson
+  --tags list    markers to look for (default TODO,FIXME,HACK,XXX)
+  --tag list     only show these markers; added to --tags if missing
   --version      print the version and exit
   -h, --help     show this help
+
+Lists are comma-separated, and list flags may be repeated.
 `
 
 func main() {
@@ -45,8 +51,13 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 	fs.Usage = func() {}
 	dir := fs.String("C", ".", "")
 	format := fs.String("format", "table", "")
+	tags := &listFlag{values: scan.DefaultTags}
+	fs.Var(tags, "tags", "")
+	var only listFlag
+	fs.Var(&only, "tag", "")
 	showVersion := fs.Bool("version", false, "")
-	if err := fs.Parse(args); err != nil {
+	paths, err := parseArgs(fs, args)
+	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			fmt.Fprint(stdout, usage)
 			return 0
@@ -57,22 +68,21 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 		fmt.Fprintln(stdout, "todo-age", buildVersion())
 		return 0
 	}
-	if fs.NArg() > 0 {
-		return usageError(stderr, fmt.Errorf("unexpected argument %q", fs.Arg(0)))
-	}
 	if !report.ValidFormat(*format) {
 		return usageError(stderr, fmt.Errorf("unknown format %q (want %s)", *format, strings.Join(report.Formats, ", ")))
 	}
 
-	m, err := scan.NewMatcher(scan.DefaultTags)
+	m, err := scan.NewMatcher(scanTags(tags.values, only.values))
 	if err != nil {
 		return usageError(stderr, err)
 	}
-	rows, err := collect(*dir, m, now, stderr)
+	opts := scanOptions{dir: *dir, paths: paths, matcher: m}
+	rows, err := collect(opts, now, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "todo-age: %v\n", err)
 		return 2
 	}
+	rows = filter{tags: only.values}.apply(rows)
 	slices.SortStableFunc(rows, func(a, b report.Row) int {
 		if c := a.Time.Compare(b.Time); c != 0 {
 			return c

@@ -10,19 +10,28 @@ import (
 	"github.com/dan2756/todo-age/internal/scan"
 )
 
-// collect scans the tracked files in dir and blames every line that holds
-// a marker. Problems with single files are reported to warn and skipped.
-func collect(dir string, m *scan.Matcher, now time.Time, warn io.Writer) ([]report.Row, error) {
+// scanOptions says which files to scan and what to look for.
+type scanOptions struct {
+	dir     string   // work tree directory to run in
+	paths   []string // pathspecs limiting the scan; empty means everything
+	matcher *scan.Matcher
+}
+
+// collect scans the tracked files selected by opts and blames every line
+// that holds a marker. Problems with single files are reported to warn and
+// skipped.
+func collect(opts scanOptions, now time.Time, warn io.Writer) ([]report.Row, error) {
+	dir := opts.dir
 	if err := git.CheckRepo(dir); err != nil {
 		return nil, err
 	}
-	files, err := git.LsFiles(dir, nil)
+	files, err := git.LsFiles(dir, opts.paths)
 	if err != nil {
 		return nil, err
 	}
 	var rows []report.Row
 	for _, f := range files {
-		hits, err := scan.File(m, dir, f, scan.DefaultMaxSize)
+		hits, err := scan.File(opts.matcher, dir, f, scan.DefaultMaxSize)
 		if err != nil {
 			return nil, err
 		}
