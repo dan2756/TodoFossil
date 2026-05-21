@@ -22,14 +22,15 @@ type Hit struct {
 }
 
 // File scans the file name, relative to root, for markers. Binary files and
-// files larger than maxSize bytes yield no hits.
+// files larger than maxSize bytes yield no hits; a maxSize of 0 means no
+// limit.
 func File(m *Matcher, root, name string, maxSize int64) ([]Hit, error) {
 	p := filepath.Join(root, filepath.FromSlash(name))
 	fi, err := os.Stat(p)
 	if err != nil {
 		return nil, err
 	}
-	if fi.Size() > maxSize {
+	if maxSize > 0 && fi.Size() > maxSize {
 		return nil, nil
 	}
 	data, err := os.ReadFile(p)

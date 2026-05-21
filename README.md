@@ -34,7 +34,13 @@ todo-age src/ cmd/              # only files under these paths
 todo-age --tag FIXME            # only FIXMEs
 todo-age --tags TODO,FIXME,BUG  # look for a different set of markers
 todo-age --format json          # also csv and ndjson
+todo-age --exclude 'vendor/**,*.min.js'
 ```
+
+Exclude patterns without a slash (`*.min.js`, `vendor`) match a file or
+directory name at any depth; patterns with a slash (`vendor/**`,
+`web/*.css`) match from the top of the scanned tree, and `**` spans any
+number of directories. Use `--max-size` to change the 1 MiB cutoff.
 
 Each row has `file`, `line`, `tag`, `text`, `owner` (from `TODO(owner)`),
 `author`, `email`, `commit`, `date`, `age_days` and `uncommitted`.

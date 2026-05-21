@@ -64,3 +64,27 @@ func TestScanTags(t *testing.T) {
 		t.Errorf("scanTags = %q, want %q", got, want)
 	}
 }
+
+func TestSizeFlag(t *testing.T) {
+	tests := map[string]int64{
+		"0":       0,
+		"1048576": 1 << 20,
+		"512K":    512 << 10,
+		"2m":      2 << 20,
+		"1MiB":    1 << 20,
+		"3 GB":    3 << 30,
+		"100b":    100,
+	}
+	for in, want := range tests {
+		var s sizeFlag
+		if err := s.Set(in); err != nil || int64(s) != want {
+			t.Errorf("Set(%q) = %d, %v; want %d", in, s, err, want)
+		}
+	}
+	for _, in := range []string{"", "big", "-1", "1.5M", "2T", "10iB", "99999999999999999999"} {
+		var s sizeFlag
+		if err := s.Set(in); err == nil {
+			t.Errorf("Set(%q): expected an error", in)
+		}
+	}
+}

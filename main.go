@@ -30,12 +30,15 @@ Usage:
 Paths limit the scan to tracked files under them.
 
 Flags:
-  -C dir         run as if todo-age was started in dir
-  --format fmt   output format: table (default), json, csv or ndjson
-  --tags list    markers to look for (default TODO,FIXME,HACK,XXX)
-  --tag list     only show these markers; added to --tags if missing
-  --version      print the version and exit
-  -h, --help     show this help
+  -C dir            run as if todo-age was started in dir
+  --format fmt      output format: table (default), json, csv or ndjson
+  --tags list       markers to look for (default TODO,FIXME,HACK,XXX)
+  --tag list        only show these markers; added to --tags if missing
+  --exclude list    skip files matching these globs, e.g. 'vendor/**,*.min.js'
+  --max-size size   skip files larger than this, e.g. 512K or 4M (default 1M,
+                    0 for no limit)
+  --version         print the version and exit
+  -h, --help        show this help
 
 Lists are comma-separated, and list flags may be repeated.
 `
@@ -55,6 +58,10 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 	fs.Var(tags, "tags", "")
 	var only listFlag
 	fs.Var(&only, "tag", "")
+	var exclude listFlag
+	fs.Var(&exclude, "exclude", "")
+	maxSize := sizeFlag(scan.DefaultMaxSize)
+	fs.Var(&maxSize, "max-size", "")
 	showVersion := fs.Bool("version", false, "")
 	paths, err := parseArgs(fs, args)
 	if err != nil {
@@ -76,7 +83,11 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 	if err != nil {
 		return usageError(stderr, err)
 	}
-	opts := scanOptions{dir: *dir, paths: paths, matcher: m}
+	ex, err := scan.NewExcluder(exclude.values)
+	if err != nil {
+		return usageError(stderr, err)
+	}
+	opts := scanOptions{dir: *dir, paths: paths, exclude: ex, maxSize: int64(maxSize), matcher: m}
 	rows, err := collect(opts, now, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "todo-age: %v\n", err)

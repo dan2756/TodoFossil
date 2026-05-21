@@ -1,7 +1,10 @@
 package main
 
 import (
+	"errors"
 	"flag"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -45,4 +48,29 @@ func parseArgs(fs *flag.FlagSet, args []string) ([]string, error) {
 		pos = append(pos, rest[0])
 		args = rest[1:]
 	}
+}
+
+// sizeFlag is a size in bytes, written as a number with an optional unit:
+// 500K, 2M, 1MiB, 1GB. Units are powers of 1024.
+type sizeFlag int64
+
+var sizeRE = regexp.MustCompile(`^(\d+)\s*([kmg]?)(i?b)?$`)
+
+func (s *sizeFlag) String() string { return strconv.FormatInt(int64(*s), 10) }
+
+func (s *sizeFlag) Set(v string) error {
+	m := sizeRE.FindStringSubmatch(strings.ToLower(strings.TrimSpace(v)))
+	if m == nil || (m[2] == "" && m[3] == "ib") {
+		return errors.New("want a size such as 500K, 2M or 1048576")
+	}
+	n, err := strconv.ParseInt(m[1], 10, 64)
+	if err != nil {
+		return errors.New("size out of range")
+	}
+	shift := map[string]uint{"": 0, "k": 10, "m": 20, "g": 30}[m[2]]
+	if n > (1<<62)>>shift {
+		return errors.New("size out of range")
+	}
+	*s = sizeFlag(n << shift)
+	return nil
 }

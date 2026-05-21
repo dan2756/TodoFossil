@@ -14,6 +14,8 @@ import (
 type scanOptions struct {
 	dir     string   // work tree directory to run in
 	paths   []string // pathspecs limiting the scan; empty means everything
+	exclude *scan.Excluder
+	maxSize int64 // skip larger files
 	matcher *scan.Matcher
 }
 
@@ -31,7 +33,10 @@ func collect(opts scanOptions, now time.Time, warn io.Writer) ([]report.Row, err
 	}
 	var rows []report.Row
 	for _, f := range files {
-		hits, err := scan.File(opts.matcher, dir, f, scan.DefaultMaxSize)
+		if opts.exclude.Match(f) {
+			continue
+		}
+		hits, err := scan.File(opts.matcher, dir, f, opts.maxSize)
 		if err != nil {
 			return nil, err
 		}
