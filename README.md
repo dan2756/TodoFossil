@@ -20,10 +20,10 @@ Run it anywhere inside a git work tree:
 
 ```sh
 $ todo-age
-AGE   DATE        AUTHOR       TAG         LOCATION              TEXT
-412d  2025-04-01  Maria Lopez  TODO        server/handler.go:88  validate the redirect target
-97d   2026-02-10  Sam Okafor   FIXME(sam)  store/cache.go:14     eviction ignores TTL
-3d    2026-05-15  Maria Lopez  HACK        cmd/main.go:41        remove once v2 config ships
+AGE     DATE        AUTHOR       TAG         LOCATION              TEXT
+1y 1mo  2025-04-01  Maria Lopez  TODO        server/handler.go:88  validate the redirect target
+3mo     2026-02-10  Sam Okafor   FIXME(sam)  store/cache.go:14     eviction ignores TTL
+3d      2026-05-19  Maria Lopez  HACK        cmd/main.go:41        remove once v2 config ships
 ```
 
 It looks for `TODO`, `FIXME`, `HACK` and `XXX` in tracked files, skipping
@@ -38,6 +38,8 @@ todo-age --exclude 'vendor/**,*.min.js'
 todo-age --older-than 90d       # ages: h, d, w, mo, y, or combined as 1y6mo
 todo-age --newer-than 2w
 todo-age --author '(?i)maria'   # regex on author name or email
+todo-age --sort author          # or file; the default is oldest first
+todo-age --limit 10             # the ten oldest
 ```
 
 Exclude patterns without a slash (`*.min.js`, `vendor`) match a file or

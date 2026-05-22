@@ -34,3 +34,28 @@ func TestParseErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestHuman(t *testing.T) {
+	tests := []struct {
+		in   time.Duration
+		want string
+	}{
+		{0, "today"},
+		{23 * time.Hour, "today"},
+		{Day, "1d"},
+		{13 * Day, "13d"},
+		{14 * Day, "2w"},
+		{21 * Day, "3w"},
+		{59 * Day, "8w"},
+		{60 * Day, "2mo"},
+		{200 * Day, "6mo"},
+		{365 * Day, "1y"},
+		{425 * Day, "1y 2mo"},
+		{3*Year + 100*Day, "3y 3mo"},
+	}
+	for _, tt := range tests {
+		if got := Human(tt.in); got != tt.want {
+			t.Errorf("Human(%v) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}

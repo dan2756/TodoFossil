@@ -11,6 +11,8 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/dan2756/todo-age/internal/age"
 )
 
 // Row is one marker together with the blame of its line.
@@ -98,8 +100,8 @@ func writeTable(w io.Writer, rows []Row) error {
 		if r.Owner != "" {
 			tag += "(" + r.Owner + ")"
 		}
-		fmt.Fprintf(tw, "%dd\t%s\t%s\t%s\t%s:%d\t%s\n",
-			r.AgeDays, r.Date, cell(r.Author), cell(tag), cell(r.File), r.Line, cell(r.Text))
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s:%d\t%s\n",
+			age.Human(r.Age), r.Date, cell(r.Author), cell(tag), cell(r.File), r.Line, cell(r.Text))
 	}
 	return tw.Flush()
 }

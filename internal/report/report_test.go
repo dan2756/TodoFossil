@@ -3,15 +3,19 @@ package report
 import (
 	"bytes"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/dan2756/todo-age/internal/age"
 )
 
 var sample = []Row{
 	{
 		File: "src/a.go", Line: 12, Tag: "TODO", Text: `say "hi", then leave`,
 		Owner: "ana", Author: "Ana, Jr.", Email: "ana@example.com",
-		Commit: "1a2b3c4", Date: "2025-03-01", AgeDays: 400,
+		Commit: "1a2b3c4", Date: "2025-03-01", AgeDays: 400, Age: 400 * age.Day,
 	},
 	{
 		File: "b c.txt", Line: 1, Tag: "FIXME", Text: " leading space",
@@ -86,5 +90,52 @@ func TestNDJSON(t *testing.T) {
 func TestUnknownFormat(t *testing.T) {
 	if err := Write(&bytes.Buffer{}, "yaml", sample); err == nil {
 		t.Error("expected an error for an unknown format")
+	}
+}
+
+func TestTable(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Write(&buf, "table", sample); err != nil {
+		t.Fatal(err)
+	}
+	want := `AGE     DATE        AUTHOR             TAG        LOCATION     TEXT
+1y 1mo  2025-03-01  Ana, Jr.           TODO(ana)  src/a.go:12  say "hi", then leave
+today   2026-04-05  Not Committed Yet  FIXME      b c.txt:1     leading space
+`
+	if got := buf.String(); got != want {
+		t.Errorf("table output:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestSort(t *testing.T) {
+	day := func(n int) time.Time { return time.Date(2025, 1, n, 0, 0, 0, 0, time.UTC) }
+	rows := func() []Row {
+		return []Row{
+			{File: "b.go", Line: 9, Author: "zed", Time: day(3)},
+			{File: "a.go", Line: 5, Author: "Amy", Time: day(2)},
+			{File: "b.go", Line: 2, Author: "amy", Time: day(2)},
+			{File: "a.go", Line: 1, Author: "Zed", Time: day(1)},
+		}
+	}
+	tests := map[string][]string{
+		"age":    {"a.go:1", "a.go:5", "b.go:2", "b.go:9"},
+		"file":   {"a.go:1", "a.go:5", "b.go:2", "b.go:9"},
+		"author": {"a.go:5", "b.go:2", "a.go:1", "b.go:9"},
+	}
+	for key, want := range tests {
+		rs := rows()
+		if err := Sort(rs, key); err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, r := range rs {
+			got = append(got, r.File+":"+strconv.Itoa(r.Line))
+		}
+		if strings.Join(got, " ") != strings.Join(want, " ") {
+			t.Errorf("sort by %s: got %v, want %v", key, got, want)
+		}
+	}
+	if err := Sort(rows(), "size"); err == nil {
+		t.Error("expected an error for an unknown sort key")
 	}
 }

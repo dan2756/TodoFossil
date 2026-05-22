@@ -1,4 +1,5 @@
-// Package age parses ages such as "90d" or "1y6mo".
+// Package age parses ages such as "90d" or "1y6mo" and formats them for
+// people.
 package age
 
 import (
@@ -70,4 +71,25 @@ func Parse(s string) (time.Duration, error) {
 		in = in[j:]
 	}
 	return total, nil
+}
+
+// Human formats d coarsely, the way a person would say it: "today", "5d",
+// "3w", "4mo", "1y" or "1y 2mo".
+func Human(d time.Duration) string {
+	days := int(d / Day)
+	switch {
+	case days < 1:
+		return "today"
+	case days < 14:
+		return fmt.Sprintf("%dd", days)
+	case days < 60:
+		return fmt.Sprintf("%dw", days/7)
+	case days < 365:
+		return fmt.Sprintf("%dmo", days/30)
+	}
+	years, months := days/365, days%365/30
+	if months == 0 {
+		return fmt.Sprintf("%dy", years)
+	}
+	return fmt.Sprintf("%dy %dmo", years, months)
 }

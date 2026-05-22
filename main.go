@@ -38,6 +38,8 @@ Flags:
   --author regex    only show lines whose author name or email matches
   --older-than age  only show markers older than age, e.g. 90d, 6mo, 1y
   --newer-than age  only show markers newer than age
+  --sort key        age (oldest first, default), file or author
+  --limit n         show at most n markers (default: all)
   --exclude list    skip files matching these globs, e.g. 'vendor/**,*.min.js'
   --max-size size   skip files larger than this, e.g. 512K or 4M (default 1M,
                     0 for no limit)
@@ -71,6 +73,8 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 	var olderThan, newerThan ageFlag
 	fs.Var(&olderThan, "older-than", "")
 	fs.Var(&newerThan, "newer-than", "")
+	sortKey := fs.String("sort", "age", "")
+	limit := fs.Int("limit", 0, "")
 	showVersion := fs.Bool("version", false, "")
 	paths, err := parseArgs(fs, args)
 	if err != nil {
@@ -86,6 +90,12 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 	}
 	if !report.ValidFormat(*format) {
 		return usageError(stderr, fmt.Errorf("unknown format %q (want %s)", *format, strings.Join(report.Formats, ", ")))
+	}
+	if !slices.Contains(report.SortKeys, *sortKey) {
+		return usageError(stderr, fmt.Errorf("unknown sort key %q (want %s)", *sortKey, strings.Join(report.SortKeys, ", ")))
+	}
+	if *limit < 0 {
+		return usageError(stderr, errors.New("--limit must not be negative"))
 	}
 	keep := filter{tags: only.values, olderThan: olderThan.d, newerThan: newerThan.d}
 	if *author != "" {
@@ -111,15 +121,12 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 		return 2
 	}
 	rows = keep.apply(rows)
-	slices.SortStableFunc(rows, func(a, b report.Row) int {
-		if c := a.Time.Compare(b.Time); c != 0 {
-			return c
-		}
-		if c := strings.Compare(a.File, b.File); c != 0 {
-			return c
-		}
-		return a.Line - b.Line
-	})
+	if err := report.Sort(rows, *sortKey); err != nil {
+		return usageError(stderr, err)
+	}
+	if *limit > 0 && len(rows) > *limit {
+		rows = rows[:*limit]
+	}
 	if err := report.Write(stdout, *format, rows); err != nil {
 		fmt.Fprintf(stderr, "todo-age: %v\n", err)
 		return 2
