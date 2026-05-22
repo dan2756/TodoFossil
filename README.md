@@ -35,6 +35,9 @@ todo-age --tag FIXME            # only FIXMEs
 todo-age --tags TODO,FIXME,BUG  # look for a different set of markers
 todo-age --format json          # also csv and ndjson
 todo-age --exclude 'vendor/**,*.min.js'
+todo-age --older-than 90d       # ages: h, d, w, mo, y, or combined as 1y6mo
+todo-age --newer-than 2w
+todo-age --author '(?i)maria'   # regex on author name or email
 ```
 
 Exclude patterns without a slash (`*.min.js`, `vendor`) match a file or

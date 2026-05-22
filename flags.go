@@ -6,6 +6,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/dan2756/todo-age/internal/age"
 )
 
 // listFlag is a comma-separated list that may also be given more than once.
@@ -72,5 +75,25 @@ func (s *sizeFlag) Set(v string) error {
 		return errors.New("size out of range")
 	}
 	*s = sizeFlag(n << shift)
+	return nil
+}
+
+// ageFlag is an age such as 90d or 6mo. Zero means the flag was not given.
+type ageFlag struct {
+	d time.Duration
+	s string
+}
+
+func (a *ageFlag) String() string { return a.s }
+
+func (a *ageFlag) Set(v string) error {
+	d, err := age.Parse(v)
+	if err != nil {
+		return err
+	}
+	if d <= 0 {
+		return errors.New("age must be greater than zero")
+	}
+	a.d, a.s = d, v
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"runtime/debug"
 	"slices"
 	"strings"
@@ -34,13 +35,17 @@ Flags:
   --format fmt      output format: table (default), json, csv or ndjson
   --tags list       markers to look for (default TODO,FIXME,HACK,XXX)
   --tag list        only show these markers; added to --tags if missing
+  --author regex    only show lines whose author name or email matches
+  --older-than age  only show markers older than age, e.g. 90d, 6mo, 1y
+  --newer-than age  only show markers newer than age
   --exclude list    skip files matching these globs, e.g. 'vendor/**,*.min.js'
   --max-size size   skip files larger than this, e.g. 512K or 4M (default 1M,
                     0 for no limit)
   --version         print the version and exit
   -h, --help        show this help
 
-Lists are comma-separated, and list flags may be repeated.
+Lists are comma-separated, and list flags may be repeated. Ages are a
+number and a unit: h, d, w, mo (30 days) or y (365 days); 1y6mo also works.
 `
 
 func main() {
@@ -62,6 +67,10 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 	fs.Var(&exclude, "exclude", "")
 	maxSize := sizeFlag(scan.DefaultMaxSize)
 	fs.Var(&maxSize, "max-size", "")
+	author := fs.String("author", "", "")
+	var olderThan, newerThan ageFlag
+	fs.Var(&olderThan, "older-than", "")
+	fs.Var(&newerThan, "newer-than", "")
 	showVersion := fs.Bool("version", false, "")
 	paths, err := parseArgs(fs, args)
 	if err != nil {
@@ -78,6 +87,14 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 	if !report.ValidFormat(*format) {
 		return usageError(stderr, fmt.Errorf("unknown format %q (want %s)", *format, strings.Join(report.Formats, ", ")))
 	}
+	keep := filter{tags: only.values, olderThan: olderThan.d, newerThan: newerThan.d}
+	if *author != "" {
+		re, err := regexp.Compile(*author)
+		if err != nil {
+			return usageError(stderr, fmt.Errorf("bad --author pattern: %v", err))
+		}
+		keep.author = re
+	}
 
 	m, err := scan.NewMatcher(scanTags(tags.values, only.values))
 	if err != nil {
@@ -93,7 +110,7 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 		fmt.Fprintf(stderr, "todo-age: %v\n", err)
 		return 2
 	}
-	rows = filter{tags: only.values}.apply(rows)
+	rows = keep.apply(rows)
 	slices.SortStableFunc(rows, func(a, b report.Row) int {
 		if c := a.Time.Compare(b.Time); c != 0 {
 			return c

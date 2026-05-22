@@ -1,19 +1,33 @@
 package main
 
 import (
+	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/dan2756/todo-age/internal/report"
 )
 
 // filter decides which rows are reported.
 type filter struct {
-	tags []string // only these tags, compared case-insensitively; empty means all
+	tags      []string       // only these tags, compared case-insensitively; empty means all
+	author    *regexp.Regexp // matched against author name and email
+	olderThan time.Duration  // zero means no limit
+	newerThan time.Duration  // zero means no limit
 }
 
 func (f filter) keep(r report.Row) bool {
 	if len(f.tags) > 0 && !containsFold(f.tags, r.Tag) {
+		return false
+	}
+	if f.author != nil && !f.author.MatchString(r.Author) && !f.author.MatchString(r.Email) {
+		return false
+	}
+	if f.olderThan > 0 && r.Age <= f.olderThan {
+		return false
+	}
+	if f.newerThan > 0 && r.Age >= f.newerThan {
 		return false
 	}
 	return true
