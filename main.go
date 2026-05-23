@@ -40,6 +40,8 @@ Flags:
   --newer-than age  only show markers newer than age
   --sort key        age (oldest first, default), file or author
   --limit n         show at most n markers (default: all)
+  --fail-older-than age
+                    exit with status 1 if any marker is older than age
   --exclude list    skip files matching these globs, e.g. 'vendor/**,*.min.js'
   --max-size size   skip files larger than this, e.g. 512K or 4M (default 1M,
                     0 for no limit)
@@ -48,6 +50,9 @@ Flags:
 
 Lists are comma-separated, and list flags may be repeated. Ages are a
 number and a unit: h, d, w, mo (30 days) or y (365 days); 1y6mo also works.
+
+Exit status is 0 on success, 1 if --fail-older-than found an older marker,
+and 2 on errors, such as not being inside a git repository.
 `
 
 func main() {
@@ -75,6 +80,8 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 	fs.Var(&newerThan, "newer-than", "")
 	sortKey := fs.String("sort", "age", "")
 	limit := fs.Int("limit", 0, "")
+	var failOlder ageFlag
+	fs.Var(&failOlder, "fail-older-than", "")
 	showVersion := fs.Bool("version", false, "")
 	paths, err := parseArgs(fs, args)
 	if err != nil {
@@ -124,6 +131,15 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 	if err := report.Sort(rows, *sortKey); err != nil {
 		return usageError(stderr, err)
 	}
+	// Count before --limit, so a short listing cannot hide an old marker.
+	stale := 0
+	if failOlder.d > 0 {
+		for _, r := range rows {
+			if r.Age > failOlder.d {
+				stale++
+			}
+		}
+	}
 	if *limit > 0 && len(rows) > *limit {
 		rows = rows[:*limit]
 	}
@@ -131,7 +147,18 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 		fmt.Fprintf(stderr, "todo-age: %v\n", err)
 		return 2
 	}
+	if stale > 0 {
+		fmt.Fprintf(stderr, "todo-age: %d %s older than %s\n", stale, plural(stale, "marker"), failOlder.s)
+		return 1
+	}
 	return 0
+}
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return word
+	}
+	return word + "s"
 }
 
 func usageError(stderr io.Writer, err error) int {

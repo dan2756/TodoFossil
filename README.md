@@ -50,6 +50,32 @@ number of directories. Use `--max-size` to change the 1 MiB cutoff.
 Each row has `file`, `line`, `tag`, `text`, `owner` (from `TODO(owner)`),
 `author`, `email`, `commit`, `date`, `age_days` and `uncommitted`.
 
+## In CI
+
+`--fail-older-than` turns the listing into a check. It exits with status 1
+if any marker that survives the filters is older than the given age, and
+prints how many there were to stderr:
+
+```sh
+$ todo-age --fail-older-than 180d --exclude 'vendor/**'
+...
+todo-age: 3 markers older than 180d
+$ echo $?
+1
+```
+
+`--limit` only shortens the listing; the check still sees every marker.
+Run CI checkouts with full history (for example `fetch-depth: 0` on GitHub
+Actions), or every line will be blamed on the shallow boundary commit.
+
+## Exit status
+
+| Code | Meaning |
+|------|---------|
+| 0    | Success. |
+| 1    | `--fail-older-than` found an older marker. |
+| 2    | Error: not a git repository, bad flags, git failed. |
+
 ## License
 
 MIT
