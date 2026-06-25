@@ -191,6 +191,29 @@ func TestEndToEndTable(t *testing.T) {
 	}
 }
 
+func TestEndToEndSummary(t *testing.T) {
+	r := historyRepo(t)
+	code, out, errOut := r.run("--summary", "--format", "json", "--limit", "1")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	var s report.Summary
+	if err := json.Unmarshal([]byte(out), &s); err != nil {
+		t.Fatal(err)
+	}
+	// --limit does not apply to the summary.
+	if s.Total != 8 || s.ByTag["TODO"] != 5 || s.ByTag["FIXME"] != 1 {
+		t.Errorf("summary = %+v", s)
+	}
+	counts := map[string]int{}
+	for _, b := range s.ByAge {
+		counts[b.Bucket] = b.Count
+	}
+	if counts["<1w"] != 2 || counts["1w-1mo"] != 1 || counts["3mo-6mo"] != 4 || counts["1y-2y"] != 1 {
+		t.Errorf("age buckets = %v", s.ByAge)
+	}
+}
+
 func TestFailOlderThan(t *testing.T) {
 	r := historyRepo(t)
 	tests := []struct {

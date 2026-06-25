@@ -40,6 +40,7 @@ Flags:
   --newer-than age  only show markers newer than age
   --sort key        age (oldest first, default), file or author
   --limit n         show at most n markers (default: all)
+  --summary         print counts per tag and age bucket instead of markers
   --fail-older-than age
                     exit with status 1 if any marker is older than age
   --exclude list    skip files matching these globs, e.g. 'vendor/**,*.min.js'
@@ -80,6 +81,7 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 	fs.Var(&newerThan, "newer-than", "")
 	sortKey := fs.String("sort", "age", "")
 	limit := fs.Int("limit", 0, "")
+	summary := fs.Bool("summary", false, "")
 	var failOlder ageFlag
 	fs.Var(&failOlder, "fail-older-than", "")
 	showVersion := fs.Bool("version", false, "")
@@ -140,10 +142,15 @@ func run(args []string, stdout, stderr io.Writer, now time.Time) int {
 			}
 		}
 	}
-	if *limit > 0 && len(rows) > *limit {
-		rows = rows[:*limit]
+	if *summary {
+		err = report.WriteSummary(stdout, *format, report.Summarize(rows))
+	} else {
+		if *limit > 0 && len(rows) > *limit {
+			rows = rows[:*limit]
+		}
+		err = report.Write(stdout, *format, rows)
 	}
-	if err := report.Write(stdout, *format, rows); err != nil {
+	if err != nil {
 		fmt.Fprintf(stderr, "todo-age: %v\n", err)
 		return 2
 	}

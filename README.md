@@ -50,6 +50,34 @@ number of directories. Use `--max-size` to change the 1 MiB cutoff.
 Each row has `file`, `line`, `tag`, `text`, `owner` (from `TODO(owner)`),
 `author`, `email`, `commit`, `date`, `age_days` and `uncommitted`.
 
+## Summary
+
+`--summary` prints counts instead of the markers themselves. Filters
+apply; `--limit` does not.
+
+```sh
+$ todo-age --summary
+TAG      COUNT
+TODO        41
+FIXME       12
+HACK         3
+XXX          1
+
+AGE      COUNT
+<1w          2
+1w-1mo       5
+1mo-3mo      9
+3mo-6mo      8
+6mo-1y      14
+1y-2y       11
+>2y          8
+
+TOTAL       57
+```
+
+With `--format json` it is an object with `total`, `by_tag` and `by_age`;
+with `csv` and `ndjson` it is one `group,key,count` entry per line.
+
 ## In CI
 
 `--fail-older-than` turns the listing into a check. It exits with status 1
