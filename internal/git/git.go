@@ -51,6 +51,13 @@ func CheckRepo(dir string) error {
 	return nil
 }
 
+// HasHead reports whether the repository in dir has a commit checked out.
+// It does not in a freshly initialized repository.
+func HasHead(dir string) bool {
+	_, err := Run(dir, "rev-parse", "--verify", "--quiet", "HEAD")
+	return err == nil
+}
+
 // LsFiles returns the tracked files under dir, relative to dir. When paths
 // are given, only files matching those pathspecs are returned, and a
 // pathspec that matches nothing is an error.

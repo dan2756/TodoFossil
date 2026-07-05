@@ -43,14 +43,16 @@ func newRepo(t *testing.T) *testRepo {
 	return r
 }
 
-func (r *testRepo) git(env []string, args ...string) {
+func (r *testRepo) git(env []string, args ...string) string {
 	r.t.Helper()
 	cmd := exec.Command("git", args...)
 	cmd.Dir = r.dir
 	cmd.Env = append(os.Environ(), env...)
-	if out, err := cmd.CombinedOutput(); err != nil {
+	out, err := cmd.CombinedOutput()
+	if err != nil {
 		r.t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
 	}
+	return strings.TrimSpace(string(out))
 }
 
 func (r *testRepo) write(name, content string) {
@@ -231,6 +233,52 @@ func TestFailOlderThan(t *testing.T) {
 		if code != tt.code || !strings.Contains(errOut, tt.msg) {
 			t.Errorf("todo-age %q: exit %d, stderr %q; want exit %d, %q", tt.args, code, errOut, tt.code, tt.msg)
 		}
+	}
+}
+
+func TestNoCommitsYet(t *testing.T) {
+	r := newRepo(t)
+	r.write("main.go", "package main\n\n// TODO: write main\n")
+	r.git(nil, "add", "main.go")
+	code, out, errOut := r.run("--format", "csv")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	want := "file,line,tag,text,owner,author,email,commit,date,age_days,uncommitted\n" +
+		"main.go,3,TODO,write main,,Not Committed Yet,,,2026-01-01,0,true\n"
+	if out != want {
+		t.Errorf("got:\n%s\nwant:\n%s", out, want)
+	}
+}
+
+func TestOddTrackedFiles(t *testing.T) {
+	r := newRepo(t)
+	r.write("a.go", "// TODO: real one\n")
+	r.write("gone.go", "// TODO: deleted locally\n")
+	r.write("dir/b.go", "// FIXME: in a directory\n")
+	for link, target := range map[string]string{"link.go": "a.go", "dirlink": "dir"} {
+		if err := os.Symlink(target, filepath.Join(r.dir, link)); err != nil {
+			t.Skip("symlinks not supported:", err)
+		}
+	}
+	r.commit("2025-07-01T00:00:00+0000", "Test User", "test@example.com", "init")
+	// A submodule is a gitlink entry whose work tree is a directory.
+	head := r.git(nil, "rev-parse", "HEAD")
+	r.git(nil, "update-index", "--add", "--cacheinfo", "160000,"+head+",sub")
+	if err := os.Mkdir(filepath.Join(r.dir, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(r.dir, "gone.go")); err != nil {
+		t.Fatal(err)
+	}
+
+	code, out, errOut := r.run("--format", "csv", "--sort", "file")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 3 || !strings.HasPrefix(lines[1], "a.go,1,TODO,") || !strings.HasPrefix(lines[2], "dir/b.go,1,FIXME,") {
+		t.Errorf("got:\n%s", out)
 	}
 }
 

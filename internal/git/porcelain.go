@@ -18,6 +18,9 @@ type Line struct {
 	AuthorTime time.Time // author date, in the author's time zone
 }
 
+// NotCommitted is how git blame describes a line with local changes.
+var NotCommitted = Line{Commit: strings.Repeat("0", 40), Author: "Not Committed Yet"}
+
 // Uncommitted reports whether the line has local changes that are not
 // committed yet. git blame reports such lines with an all-zero commit.
 func (l Line) Uncommitted() bool {

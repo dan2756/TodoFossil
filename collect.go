@@ -31,6 +31,8 @@ func collect(opts scanOptions, now time.Time, warn io.Writer) ([]report.Row, err
 	if err != nil {
 		return nil, err
 	}
+	// Before the first commit there is nothing to blame against.
+	hasHead := git.HasHead(dir)
 	var rows []report.Row
 	for _, f := range files {
 		if opts.exclude.Match(f) {
@@ -41,6 +43,12 @@ func collect(opts scanOptions, now time.Time, warn io.Writer) ([]report.Row, err
 			return nil, err
 		}
 		if len(hits) == 0 {
+			continue
+		}
+		if !hasHead {
+			for _, h := range hits {
+				rows = append(rows, newRow(h, git.NotCommitted, now))
+			}
 			continue
 		}
 		lines := make([]int, len(hits))

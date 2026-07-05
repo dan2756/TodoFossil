@@ -27,7 +27,9 @@ AGE     DATE        AUTHOR       TAG         LOCATION              TEXT
 ```
 
 It looks for `TODO`, `FIXME`, `HACK` and `XXX` in tracked files, skipping
-binary files and files over 1 MiB.
+binary files, files over 1 MiB, symlinks and submodules. Lines you have
+changed but not committed show up as `Not Committed Yet` with an age of 0,
+as do all markers in a repository without commits.
 
 ```sh
 todo-age src/ cmd/              # only files under these paths

@@ -53,3 +53,19 @@ func TestFile(t *testing.T) {
 		t.Errorf("file over max size: got %v, %v; want no hits", hits, err)
 	}
 }
+
+func TestFileSkipsNonRegular(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "real.go", "// TODO: real\n")
+	writeFile(t, dir, "sub/inner.go", "// TODO: inner\n")
+	if err := os.Symlink("real.go", filepath.Join(dir, "link.go")); err != nil {
+		t.Skip("symlinks not supported:", err)
+	}
+	m, _ := NewMatcher(DefaultTags)
+	for _, name := range []string{"link.go", "sub", "deleted.go"} {
+		hits, err := File(m, dir, name, DefaultMaxSize)
+		if err != nil || len(hits) != 0 {
+			t.Errorf("File(%s) = %v, %v; want no hits and no error", name, hits, err)
+		}
+	}
+}
