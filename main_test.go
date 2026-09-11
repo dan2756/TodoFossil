@@ -236,6 +236,25 @@ func TestFailOlderThan(t *testing.T) {
 	}
 }
 
+func TestManyFiles(t *testing.T) {
+	r := newRepo(t)
+	const n = 60
+	for i := range n {
+		r.write(fmt.Sprintf("pkg%02d/f.go", i), fmt.Sprintf("package p\n\n// TODO: item %d\n// FIXME: other %d\n", i, i))
+	}
+	r.commit("2025-03-01T00:00:00+0000", "Test User", "test@example.com", "many")
+	rows := r.rows("--sort", "age")
+	if len(rows) != 2*n {
+		t.Fatalf("got %d rows, want %d", len(rows), 2*n)
+	}
+	// Same age everywhere, so the order falls back to file and line.
+	for i, row := range rows {
+		if want := fmt.Sprintf("pkg%02d/f.go:%d", i/2, 3+i%2); loc(row) != want {
+			t.Fatalf("row %d is %s, want %s", i, loc(row), want)
+		}
+	}
+}
+
 func TestNoCommitsYet(t *testing.T) {
 	r := newRepo(t)
 	r.write("main.go", "package main\n\n// TODO: write main\n")

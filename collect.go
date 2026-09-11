@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"io"
+	"runtime"
+	"slices"
+	"sync"
 	"time"
 
 	"github.com/dan2756/todo-age/internal/git"
@@ -22,6 +25,10 @@ type scanOptions struct {
 // collect scans the tracked files selected by opts and blames every line
 // that holds a marker. Problems with single files are reported to warn and
 // skipped.
+//
+// Each file costs a git blame process, so files are handled by a pool of
+// workers. Results are put back in file order, which keeps warnings and
+// ties in the output deterministic.
 func collect(opts scanOptions, now time.Time, warn io.Writer) ([]report.Row, error) {
 	dir := opts.dir
 	if err := git.CheckRepo(dir); err != nil {
@@ -31,45 +38,81 @@ func collect(opts scanOptions, now time.Time, warn io.Writer) ([]report.Row, err
 	if err != nil {
 		return nil, err
 	}
+	files = slices.DeleteFunc(files, opts.exclude.Match)
 	// Before the first commit there is nothing to blame against.
 	hasHead := git.HasHead(dir)
+
+	results := make([]fileResult, len(files))
+	next := make(chan int)
+	var wg sync.WaitGroup
+	for range min(runtime.GOMAXPROCS(0), len(files)) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range next {
+				results[i] = collectFile(opts, files[i], hasHead, now)
+			}
+		}()
+	}
+	for i := range files {
+		next <- i
+	}
+	close(next)
+	wg.Wait()
+
 	var rows []report.Row
-	for _, f := range files {
-		if opts.exclude.Match(f) {
-			continue
+	for _, res := range results {
+		for _, w := range res.warnings {
+			fmt.Fprintf(warn, "todo-age: warning: %s\n", w)
 		}
-		hits, err := scan.File(opts.matcher, dir, f, opts.maxSize)
-		if err != nil {
-			return nil, err
+		if res.err != nil {
+			return nil, res.err
 		}
-		if len(hits) == 0 {
-			continue
-		}
-		if !hasHead {
-			for _, h := range hits {
-				rows = append(rows, newRow(h, git.NotCommitted, now))
-			}
-			continue
-		}
-		lines := make([]int, len(hits))
-		for i, h := range hits {
-			lines[i] = h.Line
-		}
-		blame, err := git.Blame(dir, f, lines)
-		if err != nil {
-			fmt.Fprintf(warn, "todo-age: warning: %s: %v\n", f, err)
-			continue
-		}
-		for _, h := range hits {
-			b, ok := blame[h.Line]
-			if !ok {
-				fmt.Fprintf(warn, "todo-age: warning: %s:%d: no blame for line\n", f, h.Line)
-				continue
-			}
-			rows = append(rows, newRow(h, b, now))
-		}
+		rows = append(rows, res.rows...)
 	}
 	return rows, nil
+}
+
+type fileResult struct {
+	rows     []report.Row
+	warnings []string
+	err      error
+}
+
+// collectFile scans and blames a single file.
+func collectFile(opts scanOptions, f string, hasHead bool, now time.Time) (res fileResult) {
+	hits, err := scan.File(opts.matcher, opts.dir, f, opts.maxSize)
+	if err != nil {
+		res.err = err
+		return res
+	}
+	if len(hits) == 0 {
+		return res
+	}
+	if !hasHead {
+		for _, h := range hits {
+			res.rows = append(res.rows, newRow(h, git.NotCommitted, now))
+		}
+		return res
+	}
+	lines := make([]int, len(hits))
+	for i, h := range hits {
+		lines[i] = h.Line
+	}
+	blame, err := git.Blame(opts.dir, f, lines)
+	if err != nil {
+		res.warnings = append(res.warnings, fmt.Sprintf("%s: %v", f, err))
+		return res
+	}
+	for _, h := range hits {
+		b, ok := blame[h.Line]
+		if !ok {
+			res.warnings = append(res.warnings, fmt.Sprintf("%s:%d: no blame for line", f, h.Line))
+			continue
+		}
+		res.rows = append(res.rows, newRow(h, b, now))
+	}
+	return res
 }
 
 func newRow(h scan.Hit, b git.Line, now time.Time) report.Row {

@@ -98,6 +98,14 @@ $ echo $?
 Run CI checkouts with full history (for example `fetch-depth: 0` on GitHub
 Actions), or every line will be blamed on the shallow boundary commit.
 
+## How it works
+
+`todo-age` lists files with `git ls-files -z`, reads each one, and runs
+`git blame --porcelain` once per file that has markers, with one `-L` range
+per run of marked lines. Files are blamed in parallel, one `git` process
+per CPU, so large repositories take seconds rather than minutes. Ages come
+from the author date of the commit that last touched the line.
+
 ## Exit status
 
 | Code | Meaning |
