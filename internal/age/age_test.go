@@ -49,7 +49,12 @@ func TestHuman(t *testing.T) {
 		{59 * Day, "8w"},
 		{60 * Day, "2mo"},
 		{200 * Day, "6mo"},
+		{359 * Day, "11mo"},
+		{360 * Day, "11mo"},
+		{364 * Day, "11mo"},
 		{365 * Day, "1y"},
+		{729 * Day, "1y 11mo"},
+		{730 * Day, "2y"},
 		{425 * Day, "1y 2mo"},
 		{3*Year + 100*Day, "3y 3mo"},
 	}

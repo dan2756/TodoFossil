@@ -40,11 +40,14 @@ func (f filter) apply(rows []report.Row) []report.Row {
 
 // scanTags returns the tags to look for: tags, plus any tag in only that is
 // not among them yet, so that --tag BUG works without also passing --tags.
+// only is compared case-insensitively, but tags are matched as written, so
+// added tags are upper-cased: --tag bug looks for BUG markers, not for the
+// word "bug" in prose.
 func scanTags(tags, only []string) []string {
 	out := slices.Clone(tags)
 	for _, t := range only {
 		if !containsFold(out, t) {
-			out = append(out, t)
+			out = append(out, strings.ToUpper(t))
 		}
 	}
 	return out

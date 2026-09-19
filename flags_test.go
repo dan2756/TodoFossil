@@ -63,6 +63,15 @@ func TestScanTags(t *testing.T) {
 	if want := []string{"TODO", "FIXME", "BUG"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("scanTags = %q, want %q", got, want)
 	}
+	// Tags are matched case-sensitively, so --tag bug must look for BUG.
+	got = scanTags([]string{"TODO"}, []string{"bug", "Bug"})
+	if want := []string{"TODO", "BUG"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("scanTags with lowercase --tag = %q, want %q", got, want)
+	}
+	got = scanTags([]string{"note"}, []string{"NOTE"})
+	if want := []string{"note"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("scanTags with a tag already in --tags = %q, want %q", got, want)
+	}
 }
 
 func TestSizeFlag(t *testing.T) {

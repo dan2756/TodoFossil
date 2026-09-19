@@ -62,7 +62,8 @@ func TestFileSkipsNonRegular(t *testing.T) {
 		t.Skip("symlinks not supported:", err)
 	}
 	m, _ := NewMatcher(DefaultTags)
-	for _, name := range []string{"link.go", "sub", "deleted.go"} {
+	// real.go/x.go: a tracked directory that has become a file.
+	for _, name := range []string{"link.go", "sub", "deleted.go", "real.go/x.go"} {
 		hits, err := File(m, dir, name, DefaultMaxSize)
 		if err != nil || len(hits) != 0 {
 			t.Errorf("File(%s) = %v, %v; want no hits and no error", name, hits, err)

@@ -10,17 +10,19 @@ import (
 //
 // A pattern without a slash, such as "*.min.js" or "vendor", matches any
 // single path element, so it excludes matching files and everything under
-// matching directories at any depth. A pattern with a slash, such as
-// "vendor/**" or "web/*.js", is matched against the path from its start;
-// "**" matches any number of path elements. A pattern that matches a
-// directory excludes everything below it.
+// matching directories at any depth. A pattern with a slash at its start or
+// in its middle, such as "/docs", "vendor/**" or "web/*.js", is matched
+// against the path from its start; "**" matches any number of path
+// elements. As in .gitignore, a trailing slash does not count, so "docs/"
+// is the same as "docs". A pattern that matches a directory excludes
+// everything below it.
 type Excluder struct {
 	patterns []pattern
 }
 
 type pattern struct {
 	elems    []string
-	anywhere bool // no slash: match any single element
+	anywhere bool // no leading or inner slash: match any single element
 }
 
 // NewExcluder compiles patterns. Empty patterns are ignored.
@@ -28,6 +30,7 @@ func NewExcluder(patterns []string) (*Excluder, error) {
 	e := &Excluder{}
 	for _, raw := range patterns {
 		p := strings.TrimSpace(raw)
+		anchored := strings.HasPrefix(p, "/") || strings.HasPrefix(p, "./")
 		p = strings.TrimPrefix(p, "./")
 		p = strings.Trim(p, "/")
 		if p == "" {
@@ -39,7 +42,7 @@ func NewExcluder(patterns []string) (*Excluder, error) {
 				return nil, fmt.Errorf("bad exclude pattern %q: %w", raw, err)
 			}
 		}
-		e.patterns = append(e.patterns, pattern{elems: elems, anywhere: len(elems) == 1})
+		e.patterns = append(e.patterns, pattern{elems: elems, anywhere: len(elems) == 1 && !anchored})
 	}
 	return e, nil
 }

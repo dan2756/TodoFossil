@@ -85,9 +85,11 @@ func Human(d time.Duration) string {
 	case days < 60:
 		return fmt.Sprintf("%dw", days/7)
 	case days < 365:
-		return fmt.Sprintf("%dmo", days/30)
+		// Twelve 30-day months are 360 days, so the last few days of a year
+		// would read "12mo".
+		return fmt.Sprintf("%dmo", min(days/30, 11))
 	}
-	years, months := days/365, days%365/30
+	years, months := days/365, min(days%365/30, 11)
 	if months == 0 {
 		return fmt.Sprintf("%dy", years)
 	}

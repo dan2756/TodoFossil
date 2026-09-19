@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 // DefaultMaxSize is the size in bytes above which files are not scanned.
@@ -25,13 +26,14 @@ type Hit struct {
 
 // File scans the file name, relative to root, for markers. Binary files and
 // files larger than maxSize bytes yield no hits; a maxSize of 0 means no
-// limit. So do files that are missing (deleted but still tracked) and
-// anything that is not a regular file: symlinks, whose blame is that of the
-// link rather than its target, and submodule directories.
+// limit. So do files that are missing (deleted but still tracked, also when
+// a directory on their path has been replaced by a file) and anything that
+// is not a regular file: symlinks, whose blame is that of the link rather
+// than its target, and submodule directories.
 func File(m *Matcher, root, name string, maxSize int64) ([]Hit, error) {
 	p := filepath.Join(root, filepath.FromSlash(name))
 	fi, err := os.Lstat(p)
-	if errors.Is(err, fs.ErrNotExist) {
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
 		return nil, nil
 	}
 	if err != nil {

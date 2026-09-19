@@ -28,24 +28,30 @@ according to git blame.
 Usage:
   todo-age [flags] [path ...]
 
-Paths limit the scan to tracked files under them.
+Paths limit the scan to tracked files under them. Files are listed relative
+to the current directory, as git ls-files lists them.
 
-Flags:
+Scanning:
   -C dir            run as if todo-age was started in dir
-  --format fmt      output format: table (default), json, csv or ndjson
   --tags list       markers to look for (default TODO,FIXME,HACK,XXX)
-  --tag list        only show these markers; added to --tags if missing
+  --exclude list    skip files matching these globs, e.g. 'vendor/**,*.min.js'
+  --max-size size   skip files larger than this, e.g. 512K or 4M
+                    (default 1M, 0 for no limit)
+
+Filtering and sorting:
+  --tag list        only show these markers; added to --tags in upper case
+                    if missing
   --author regex    only show lines whose author name or email matches
   --older-than age  only show markers older than age, e.g. 90d, 6mo, 1y
   --newer-than age  only show markers newer than age
   --sort key        age (oldest first, default), file or author
   --limit n         show at most n markers (default: all)
+
+Output:
+  --format fmt      table (default), json, csv or ndjson
   --summary         print counts per tag and age bucket instead of markers
   --fail-older-than age
                     exit with status 1 if any marker is older than age
-  --exclude list    skip files matching these globs, e.g. 'vendor/**,*.min.js'
-  --max-size size   skip files larger than this, e.g. 512K or 4M (default 1M,
-                    0 for no limit)
   --version         print the version and exit
   -h, --help        show this help
 

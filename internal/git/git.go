@@ -85,13 +85,21 @@ func LsFiles(dir string, paths []string) ([]string, error) {
 	return files, nil
 }
 
+// maxRanges is the most -L ranges passed to one git blame. Past it the
+// whole file is blamed instead, as a command line with tens of thousands
+// of ranges exceeds the system's limit on argument length.
+const maxRanges = 1000
+
 // Blame runs git blame --porcelain on path for the given line numbers,
 // passing one -L range per run of consecutive lines so that a file is
-// blamed once no matter how many lines are asked for.
+// blamed once no matter how many lines are asked for. The result may also
+// hold lines that were not asked for.
 func Blame(dir, path string, lines []int) (map[int]Line, error) {
 	args := []string{"blame", "--porcelain"}
-	for _, r := range Ranges(lines) {
-		args = append(args, "-L", strconv.Itoa(r[0])+","+strconv.Itoa(r[1]))
+	if ranges := Ranges(lines); len(ranges) <= maxRanges {
+		for _, r := range ranges {
+			args = append(args, "-L", strconv.Itoa(r[0])+","+strconv.Itoa(r[1]))
+		}
 	}
 	args = append(args, "--", path)
 	out, err := Run(dir, args...)

@@ -301,6 +301,59 @@ func TestOddTrackedFiles(t *testing.T) {
 	}
 }
 
+func TestUnreadableFiles(t *testing.T) {
+	r := newRepo(t)
+	r.write("a.go", "// TODO: readable\n")
+	r.write("dir/x.go", "// TODO: directory became a file\n")
+	r.write("loop/y.go", "// TODO: behind a symlink loop\n")
+	r.commit("2025-07-01T00:00:00+0000", "Test User", "test@example.com", "init")
+	// git status lists dir/x.go as deleted.
+	if err := os.RemoveAll(filepath.Join(r.dir, "dir")); err != nil {
+		t.Fatal(err)
+	}
+	r.write("dir", "now a file\n")
+	// loop/y.go cannot be opened, not even by root.
+	if err := os.RemoveAll(filepath.Join(r.dir, "loop")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("loop", filepath.Join(r.dir, "loop")); err != nil {
+		t.Skip("symlinks not supported:", err)
+	}
+
+	code, out, errOut := r.run("--format", "csv")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 2 || !strings.HasPrefix(lines[1], "a.go,1,TODO,") {
+		t.Errorf("got:\n%s", out)
+	}
+	if !strings.Contains(errOut, "warning:") || !strings.Contains(errOut, "y.go") || strings.Contains(errOut, "x.go") {
+		t.Errorf("stderr %q; want a warning about loop/y.go only", errOut)
+	}
+}
+
+func TestManyMarkerRuns(t *testing.T) {
+	r := newRepo(t)
+	// As many -L ranges as separate marked lines would not fit on a command
+	// line; the file is still under the default --max-size.
+	const n = 90000
+	r.write("gen.txt", strings.Repeat("// TODO x\n\n", n))
+	r.commit("2020-01-01T00:00:00+0000", "Test User", "test@example.com", "generated")
+	r.write("gen.txt", strings.Repeat("// TODO x\n\n", n)+"// TODO new\n")
+	code, out, errOut := r.run("--summary", "--format", "json", "--fail-older-than", "1y")
+	if code != 1 || !strings.Contains(errOut, fmt.Sprintf("%d markers older than 1y", n)) || strings.Contains(errOut, "warning") {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	var s report.Summary
+	if err := json.Unmarshal([]byte(out), &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.Total != n+1 {
+		t.Errorf("total = %d, want %d", s.Total, n+1)
+	}
+}
+
 func TestErrors(t *testing.T) {
 	notRepo := t.TempDir()
 	// Do not let git find a repository above the temp dir.

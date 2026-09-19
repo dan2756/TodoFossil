@@ -65,9 +65,6 @@ func collect(opts scanOptions, now time.Time, warn io.Writer) ([]report.Row, err
 		for _, w := range res.warnings {
 			fmt.Fprintf(warn, "todo-age: warning: %s\n", w)
 		}
-		if res.err != nil {
-			return nil, res.err
-		}
 		rows = append(rows, res.rows...)
 	}
 	return rows, nil
@@ -76,14 +73,14 @@ func collect(opts scanOptions, now time.Time, warn io.Writer) ([]report.Row, err
 type fileResult struct {
 	rows     []report.Row
 	warnings []string
-	err      error
 }
 
 // collectFile scans and blames a single file.
 func collectFile(opts scanOptions, f string, hasHead bool, now time.Time) (res fileResult) {
 	hits, err := scan.File(opts.matcher, opts.dir, f, opts.maxSize)
 	if err != nil {
-		res.err = err
+		// Such as permission denied; the error names the file.
+		res.warnings = append(res.warnings, err.Error())
 		return res
 	}
 	if len(hits) == 0 {
