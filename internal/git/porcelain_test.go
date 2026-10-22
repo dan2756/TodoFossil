@@ -82,6 +82,43 @@ func TestParsePorcelainEmpty(t *testing.T) {
 	}
 }
 
+func TestParsePorcelainSHA256(t *testing.T) {
+	const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	if len(hash) != 64 {
+		t.Fatalf("fixture hash length %d, want 64", len(hash))
+	}
+	in := hash + " 4 4 1\n" +
+		"author Ada Lovelace\n" +
+		"author-mail <ada@example.com>\n" +
+		"author-time 1735689600\n" +
+		"author-tz -0700\n" +
+		"\t// TODO: sha\n" +
+		strings.Repeat("0", 64) + " 5 5 1\n" +
+		"author Not Committed Yet\n" +
+		"author-mail <not.committed.yet>\n" +
+		"author-time 1700000000\n" +
+		"author-tz +0000\n" +
+		"\t// TODO: new\n"
+	lines, err := ParsePorcelain(strings.NewReader(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lines) != 2 {
+		t.Fatalf("got %d lines, want 2", len(lines))
+	}
+	got := lines[4]
+	if got.Commit != hash || got.Author != "Ada Lovelace" || got.AuthorMail != "ada@example.com" || got.Uncommitted() {
+		t.Fatalf("line 4 = %+v", got)
+	}
+	if ts := got.AuthorTime.Format(time.RFC3339); ts != "2024-12-31T17:00:00-07:00" {
+		t.Fatalf("line 4 time %s", ts)
+	}
+	fresh := lines[5]
+	if !fresh.Uncommitted() || fresh.Author != "Not Committed Yet" || fresh.Commit != strings.Repeat("0", 64) {
+		t.Fatalf("line 5 = %+v", fresh)
+	}
+}
+
 func TestRanges(t *testing.T) {
 	tests := []struct {
 		in   []int
