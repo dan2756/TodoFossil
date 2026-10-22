@@ -96,10 +96,14 @@ func WriteSummary(w io.Writer, format string, s Summary) error {
 		return writeSummaryTable(w, s)
 	case "json":
 		enc := json.NewEncoder(w)
+		// Bucket names are "<1w" and ">2y". Leave the brackets as characters,
+		// matching the table and the marker JSON.
+		enc.SetEscapeHTML(false)
 		enc.SetIndent("", "  ")
 		return enc.Encode(s)
 	case "ndjson":
 		enc := json.NewEncoder(w)
+		enc.SetEscapeHTML(false)
 		for _, e := range s.entries() {
 			if err := enc.Encode(e); err != nil {
 				return err

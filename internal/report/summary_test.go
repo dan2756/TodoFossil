@@ -3,6 +3,7 @@ package report
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -105,5 +106,22 @@ func TestSummaryJSON(t *testing.T) {
 	}
 	if got.Total != 0 || got.ByTag == nil || len(got.ByAge) != 7 {
 		t.Errorf("empty summary = %s", buf.String())
+	}
+}
+
+func TestSummaryJSONBucketNames(t *testing.T) {
+	rows := []Row{{Tag: "TODO", Age: time.Hour}}
+	for _, format := range []string{"json", "ndjson"} {
+		var buf bytes.Buffer
+		if err := WriteSummary(&buf, format, Summarize(rows)); err != nil {
+			t.Fatal(err)
+		}
+		got := buf.String()
+		if strings.Contains(got, `\u003c`) || strings.Contains(got, `\u003e`) {
+			t.Errorf("%s HTML-escaped a bucket name:\n%s", format, got)
+		}
+		if !strings.Contains(got, `"<1w"`) || !strings.Contains(got, `">2y"`) {
+			t.Errorf("%s missing literal bucket names:\n%s", format, got)
+		}
 	}
 }
