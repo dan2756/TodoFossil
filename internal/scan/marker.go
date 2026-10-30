@@ -53,7 +53,7 @@ func NewMatcher(tags []string) (*Matcher, error) {
 // whole word, optionally followed by "(owner)" and a colon; its text is the
 // rest of the line. Letters, digits and combining marks outside ASCII are
 // part of the word, so "ÄTODO" is not a marker. A tag that is itself a
-// quoted string, as in []string{"TODO"}, is not a marker.
+// quoted string, as in []string{"TODO"} or “TODO”, is not a marker.
 func (m *Matcher) Find(line string) (Match, bool) {
 	for _, loc := range m.re.FindAllStringIndex(line, -1) {
 		start, end := loc[0], loc[1]
@@ -103,13 +103,27 @@ func wholeWord(line string, start, end int) bool {
 	return true
 }
 
-// quoted reports whether line[start:end] is wrapped in matching quotes.
+// quotePairs maps an opening quote to the quote that closes it.
+// Straight quotes, backticks, curly quotes and guillemets all count, so a
+// tag wrapped as "TODO" or “TODO” is not a marker.
+var quotePairs = map[rune]rune{
+	'"':  '"',
+	'\'': '\'',
+	'`':  '`',
+	'“':  '”',
+	'‘':  '’',
+	'«':  '»',
+}
+
+// quoted reports whether line[start:end] is wrapped in a matching quote pair.
 func quoted(line string, start, end int) bool {
 	if start == 0 || end >= len(line) {
 		return false
 	}
-	q := line[start-1]
-	return (q == '"' || q == '\'' || q == '`') && line[end] == q
+	prev, _ := utf8.DecodeLastRuneInString(line[:start])
+	next, _ := utf8.DecodeRuneInString(line[end:])
+	closer, ok := quotePairs[prev]
+	return ok && next == closer
 }
 
 // cleanText strips the separator between a marker and its text, and any

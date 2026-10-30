@@ -37,6 +37,11 @@ func TestFind(t *testing.T) {
 		{"// café TODO: keep", Match{"TODO", "", "keep"}, true},
 		{"// TODO: über", Match{"TODO", "", "über"}, true},
 		{"tags := []string{\"TODO\", 'FIXME', `XXX`}", Match{}, false},
+		{"// see “TODO” here", Match{}, false},
+		{"// see ‘FIXME’ here", Match{}, false},
+		{"// see «XXX» here", Match{}, false},
+		{"// “TODO” then TODO: real", Match{"TODO", "", "real"}, true},
+		{"// “TODO: inside quotes”", Match{"TODO", "", "inside quotes”"}, true},
 		{"", Match{}, false},
 	}
 	for _, tt := range tests {
