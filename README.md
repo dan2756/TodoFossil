@@ -106,8 +106,9 @@ its text:
 | `<!-- XXX - remove before launch -->` | `XXX` | | `remove before launch` |
 
 `TODOS`, `todo`, `TODO_LIST` and a tag that is itself a quoted string, such
-as `[]string{"TODO"}`, are not markers. Only the first marker on a line is
-reported.
+as `[]string{"TODO"}`, are not markers. Letters and digits outside ASCII
+count as part of the word too, so `ÄTODO` and `TODO²` are not markers
+either. Only the first marker on a line is reported.
 
 ## Output
 

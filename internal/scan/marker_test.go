@@ -29,6 +29,13 @@ func TestFind(t *testing.T) {
 		{"// todo: lowercase is not a marker", Match{}, false},
 		{"var TODO_LIST = nil", Match{}, false},
 		{"const mask = 0xXXX", Match{}, false},
+		{"// ÄTODO: glued to a letter", Match{}, false},
+		{"// TODOα: glued to a letter", Match{}, false},
+		{"// TODO²: glued to a digit", Match{}, false},
+		{"// TODO\u0301: combining mark", Match{}, false},
+		{"// ÄTODO then TODO: real", Match{"TODO", "", "real"}, true},
+		{"// café TODO: keep", Match{"TODO", "", "keep"}, true},
+		{"// TODO: über", Match{"TODO", "", "über"}, true},
 		{"tags := []string{\"TODO\", 'FIXME', `XXX`}", Match{}, false},
 		{"", Match{}, false},
 	}
