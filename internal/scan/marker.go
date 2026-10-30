@@ -31,7 +31,18 @@ var (
 )
 
 // commentClosers are stripped from the end of a marker's text.
-var commentClosers = []string{"*/", "-->", "#}", "%>"}
+// A closer with an opener is removed only when that opener appears before
+// the marker, so a trailing "-->" stays an arrow unless the line opened an
+// HTML comment.
+var commentClosers = []struct {
+	closer string
+	opener string
+}{
+	{"*/", ""},
+	{"-->", "<!--"},
+	{"#}", ""},
+	{"%>", ""},
+}
 
 // NewMatcher returns a Matcher for tags. Tags are case-sensitive and may
 // contain only letters, digits and underscores.
@@ -66,7 +77,7 @@ func (m *Matcher) Find(line string) (Match, bool) {
 			match.Owner = strings.TrimSpace(sm[1])
 			rest = rest[len(sm[0]):]
 		}
-		match.Text = cleanText(rest)
+		match.Text = cleanText(line[:start], rest)
 		return match, true
 	}
 	return Match{}, false
@@ -126,12 +137,16 @@ func quoted(line string, start, end int) bool {
 	return ok && next == closer
 }
 
-// cleanText strips the separator between a marker and its text, and any
-// comment terminator at the end of the line.
-func cleanText(s string) string {
+// cleanText strips the separator between a marker and its text, and a
+// comment terminator at the end of the line. before is the text that
+// precedes the marker.
+func cleanText(before, s string) string {
 	s = strings.TrimSpace(s)
 	for _, c := range commentClosers {
-		if t, ok := strings.CutSuffix(s, c); ok {
+		if c.opener != "" && !strings.Contains(before, c.opener) {
+			continue
+		}
+		if t, ok := strings.CutSuffix(s, c.closer); ok {
 			s = strings.TrimSpace(t)
 			break
 		}
