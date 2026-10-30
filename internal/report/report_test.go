@@ -107,6 +107,36 @@ today   2026-04-05  Not Committed Yet  FIXME      b c.txt:1     leading space
 	}
 }
 
+func TestTableStripsControls(t *testing.T) {
+	text := "bell\x07 and\x1b[0m esc\u2028line"
+	rows := []Row{{
+		File: "a.go", Line: 3, Tag: "TODO", Text: text,
+		Author: "Ada\tLovelace", Date: "2026-01-01", Age: 2 * age.Day,
+	}}
+	var table bytes.Buffer
+	if err := Write(&table, "table", rows); err != nil {
+		t.Fatal(err)
+	}
+	got := table.String()
+	if strings.ContainsAny(got, "\a\x1b\t") || strings.ContainsRune(got, '\u2028') {
+		t.Fatalf("table leaked controls:\n%q", got)
+	}
+	if !strings.Contains(got, "Ada Lovelace") || !strings.Contains(got, "bell  and [0m esc line") {
+		t.Fatalf("table:\n%s", got)
+	}
+	var js bytes.Buffer
+	if err := Write(&js, "json", rows); err != nil {
+		t.Fatal(err)
+	}
+	var decoded []Row
+	if err := json.Unmarshal(js.Bytes(), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded[0].Text != text || decoded[0].Author != "Ada\tLovelace" {
+		t.Fatalf("json changed the fields: %+v", decoded[0])
+	}
+}
+
 func TestSort(t *testing.T) {
 	day := func(n int) time.Time { return time.Date(2025, 1, n, 0, 0, 0, 0, time.UTC) }
 	rows := func() []Row {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+	"unicode"
 
 	"github.com/dan2756/todo-age/internal/age"
 )
@@ -106,7 +107,14 @@ func writeTable(w io.Writer, rows []Row) error {
 	return tw.Flush()
 }
 
-// cell keeps tabs and newlines in a value from breaking table columns.
+// cell keeps tabs, newlines and other control characters in a value from
+// breaking table columns or emitting a terminal escape. Line and paragraph
+// separators are not controls, but they break a row the same way.
 func cell(s string) string {
-	return strings.NewReplacer("\t", " ", "\n", " ", "\r", "").Replace(s)
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || r == '\u2028' || r == '\u2029' {
+			return ' '
+		}
+		return r
+	}, s)
 }
