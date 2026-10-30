@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // DefaultTags are the markers looked for when none are configured.
@@ -49,12 +51,13 @@ func NewMatcher(tags []string) (*Matcher, error) {
 
 // Find returns the first marker on line, if any. A marker is a tag as a
 // whole word, optionally followed by "(owner)" and a colon; its text is the
-// rest of the line. A tag that is itself a quoted string, as in
-// []string{"TODO"}, is not a marker.
+// rest of the line. Letters, digits and combining marks outside ASCII are
+// part of the word, so "ÄTODO" is not a marker. A tag that is itself a
+// quoted string, as in []string{"TODO"}, is not a marker.
 func (m *Matcher) Find(line string) (Match, bool) {
 	for _, loc := range m.re.FindAllStringIndex(line, -1) {
 		start, end := loc[0], loc[1]
-		if quoted(line, start, end) {
+		if !wholeWord(line, start, end) || quoted(line, start, end) {
 			continue
 		}
 		match := Match{Tag: line[start:end]}
@@ -73,6 +76,31 @@ func (m *Matcher) Find(line string) (Match, bool) {
 // files can be skipped without splitting them into lines.
 func (m *Matcher) mayContain(data []byte) bool {
 	return m.re.Match(data)
+}
+
+// identRune reports whether r continues a word. The matcher's \b is
+// ASCII-only, so without this a tag glued to a non-ASCII letter or digit
+// would look like a whole word.
+func identRune(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsNumber(r) || unicode.Is(unicode.M, r) || r == '_'
+}
+
+// wholeWord reports whether line[start:end] is bounded by a word break,
+// counting Unicode letters, digits and combining marks as part of the word.
+func wholeWord(line string, start, end int) bool {
+	if start > 0 {
+		r, _ := utf8.DecodeLastRuneInString(line[:start])
+		if identRune(r) {
+			return false
+		}
+	}
+	if end < len(line) {
+		r, _ := utf8.DecodeRuneInString(line[end:])
+		if identRune(r) {
+			return false
+		}
+	}
+	return true
 }
 
 // quoted reports whether line[start:end] is wrapped in matching quotes.
