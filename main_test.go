@@ -186,6 +186,46 @@ func TestAgeUsesAuthorDate(t *testing.T) {
 	}
 }
 
+func TestAuthorDateUsesAuthorZone(t *testing.T) {
+	r := newRepo(t)
+	r.write("a.go", "// TODO: boundary\n")
+	r.git(nil, "add", "-A")
+	r.git([]string{
+		"GIT_AUTHOR_DATE=2024-06-01T00:30:00+1400",
+		"GIT_COMMITTER_DATE=2024-06-02T00:00:00+0000",
+		"GIT_AUTHOR_NAME=TZ Author",
+		"GIT_AUTHOR_EMAIL=tz@example.com",
+		"GIT_COMMITTER_NAME=Later Committer",
+		"GIT_COMMITTER_EMAIL=later@example.com",
+	}, "commit", "-q", "-m", "tz")
+
+	rows := r.rows()
+	if len(rows) != 1 {
+		t.Fatalf("got %d rows, want 1", len(rows))
+	}
+	// 00:30 at UTC+14 is still the previous day in UTC, and the committer
+	// date is the day after. The reported date has to follow the author.
+	authorAt, err := time.Parse(time.RFC3339, "2024-06-01T00:30:00+14:00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	asUTC, err := time.Parse(time.RFC3339, "2024-06-01T00:30:00Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantDays := int(testNow.Sub(authorAt) / (24 * time.Hour))
+	utcDays := int(testNow.Sub(asUTC) / (24 * time.Hour))
+	if wantDays == utcDays || authorAt.In(time.UTC).Format(time.DateOnly) == "2024-06-01" {
+		t.Fatal("fixture does not separate the author zone from UTC")
+	}
+	got := rows[0]
+	if got.Author != "TZ Author" || got.Email != "tz@example.com" ||
+		got.Date != "2024-06-01" || got.AgeDays != wantDays {
+		t.Fatalf("row = %+v; want author date 2024-06-01 (%d days, not UTC date %s or %d days)",
+			got, wantDays, authorAt.In(time.UTC).Format(time.DateOnly), utcDays)
+	}
+}
+
 func TestEndToEndFilters(t *testing.T) {
 	r := historyRepo(t)
 	tests := []struct {
