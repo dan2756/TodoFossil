@@ -425,6 +425,27 @@ func TestManyMarkerRuns(t *testing.T) {
 	}
 }
 
+func TestBlameFailureSkipsFile(t *testing.T) {
+	r := newRepo(t)
+	r.write("a.go", "// TODO: one\n")
+	r.write("b.go", "// FIXME: two\n")
+	r.commit("2024-06-01T00:00:00+0000", "Test User", "test@example.com", "init")
+	// A missing ignore-revs file makes git blame fail without taking the
+	// repository out from under ls-files.
+	r.git(nil, "config", "blame.ignoreRevsFile", filepath.Join(t.TempDir(), "missing-revs"))
+
+	code, out, errOut := r.run("--format", "csv", "--sort", "file")
+	if code != 0 {
+		t.Fatalf("exit %d, want 0; stderr %q", code, errOut)
+	}
+	if !strings.Contains(errOut, "warning:") || !strings.Contains(errOut, "a.go") || !strings.Contains(errOut, "b.go") {
+		t.Fatalf("stderr %q; want a warning for each file", errOut)
+	}
+	if out != "file,line,tag,text,owner,author,email,commit,date,age_days,uncommitted\n" {
+		t.Fatalf("stdout %q; want only the csv header", out)
+	}
+}
+
 func TestErrors(t *testing.T) {
 	notRepo := t.TempDir()
 	// Do not let git find a repository above the temp dir.
