@@ -137,6 +137,38 @@ func TestTableStripsControls(t *testing.T) {
 	}
 }
 
+func TestTableStripsBidi(t *testing.T) {
+	text := "safe\u202Etxt.og\u2066"
+	rows := []Row{{
+		File: "a\u200F.go", Line: 3, Tag: "TODO", Text: text,
+		Author: "Ann\u202E", Date: "2026-01-01", Age: 2 * age.Day,
+	}}
+	var table bytes.Buffer
+	if err := Write(&table, "table", rows); err != nil {
+		t.Fatal(err)
+	}
+	got := table.String()
+	for _, r := range []rune{'\u202E', '\u2066', '\u200F'} {
+		if strings.ContainsRune(got, r) {
+			t.Fatalf("table leaked bidi %U:\n%q", r, got)
+		}
+	}
+	if !strings.Contains(got, "safe txt.og") || !strings.Contains(got, "Ann ") || !strings.Contains(got, "a .go:3") {
+		t.Fatalf("table:\n%s", got)
+	}
+	var js bytes.Buffer
+	if err := Write(&js, "json", rows); err != nil {
+		t.Fatal(err)
+	}
+	var decoded []Row
+	if err := json.Unmarshal(js.Bytes(), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded[0].Text != text || decoded[0].Author != "Ann\u202E" || decoded[0].File != "a\u200F.go" {
+		t.Fatalf("json changed the fields: %+v", decoded[0])
+	}
+}
+
 func TestSort(t *testing.T) {
 	day := func(n int) time.Time { return time.Date(2025, 1, n, 0, 0, 0, 0, time.UTC) }
 	rows := func() []Row {
