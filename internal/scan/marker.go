@@ -31,17 +31,18 @@ var (
 )
 
 // commentClosers are stripped from the end of a marker's text.
-// A closer with an opener is removed only when that opener appears before
-// the marker, so a trailing "-->" stays an arrow unless the line opened an
-// HTML comment.
+// A closer with an opener is removed only when that comment is still open
+// before the marker, so "-->" stays an arrow unless an HTML comment is
+// open, and "#}" or "%>" stay in ordinary text. A closer with no opener is
+// always removed: a block comment's "/*" may be on an earlier line.
 var commentClosers = []struct {
 	closer string
 	opener string
 }{
 	{"*/", ""},
 	{"-->", "<!--"},
-	{"#}", ""},
-	{"%>", ""},
+	{"#}", "{#"},
+	{"%>", "<%"},
 }
 
 // NewMatcher returns a Matcher for tags. Tags are case-sensitive and may
@@ -143,7 +144,7 @@ func quoted(line string, start, end int) bool {
 func cleanText(before, s string) string {
 	s = strings.TrimSpace(s)
 	for _, c := range commentClosers {
-		if c.opener != "" && !strings.Contains(before, c.opener) {
+		if !closerApplies(before, c.opener, c.closer) {
 			continue
 		}
 		if t, ok := strings.CutSuffix(s, c.closer); ok {
@@ -157,4 +158,20 @@ func cleanText(before, s string) string {
 		s = t
 	}
 	return strings.TrimSpace(s)
+}
+
+// closerApplies reports whether a trailing closer belongs to a comment that
+// is still open before the marker. An empty opener is always eligible.
+// Otherwise the last opener must sit after the last closer, so a finished
+// comment earlier on the line does not eat an arrow or a template closer
+// in the marker text.
+func closerApplies(before, opener, closer string) bool {
+	if opener == "" {
+		return true
+	}
+	open := strings.LastIndex(before, opener)
+	if open < 0 {
+		return false
+	}
+	return open > strings.LastIndex(before, closer)
 }
