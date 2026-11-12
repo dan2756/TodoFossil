@@ -109,12 +109,27 @@ func writeTable(w io.Writer, rows []Row) error {
 
 // cell keeps tabs, newlines and other control characters in a value from
 // breaking table columns or emitting a terminal escape. Line and paragraph
-// separators are not controls, but they break a row the same way.
+// separators and bidi controls are not control characters, but they break a
+// row the same way: a separator splits it, and a right-to-left override
+// reorders the rest of it so marker text can land in another column.
 func cell(s string) string {
 	return strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) || r == '\u2028' || r == '\u2029' {
+		if unicode.IsControl(r) || isBidiControl(r) || r == '\u2028' || r == '\u2029' {
 			return ' '
 		}
 		return r
 	}, s)
+}
+
+// isBidiControl reports whether r is a bidirectional control (Unicode
+// Bidi_Control), including embeds, overrides, isolates and marks.
+func isBidiControl(r rune) bool {
+	switch r {
+	case '\u061C', '\u200E', '\u200F',
+		'\u202A', '\u202B', '\u202C', '\u202D', '\u202E',
+		'\u2066', '\u2067', '\u2068', '\u2069':
+		return true
+	default:
+		return false
+	}
 }
